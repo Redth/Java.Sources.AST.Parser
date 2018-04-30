@@ -2,12 +2,12 @@ package com.xamarin.javaastparameternames;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import java.io.BufferedWriter;
@@ -15,7 +15,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -210,53 +209,71 @@ public class Main {
         // Go through all the types in the file
         NodeList<TypeDeclaration<?>> types = cu.getTypes();
         for (TypeDeclaration<?> type : types) {
-
+            
             if (!(type instanceof ClassOrInterfaceDeclaration))
                 continue;
             
-            Boolean isInterface = ((ClassOrInterfaceDeclaration) type).isInterface();
-                    
-            // Get our type's name
-            String typeName = type.getNameAsString();
-            TypeInfo typeInfo = pkgInfo.getOrDefault(typeName, new TypeInfo (typeName, isInterface));
+            ClassOrInterfaceDeclaration classOrIface = (ClassOrInterfaceDeclaration)type;
             
-            // Go through all fields, methods, etc. in this type
-            NodeList<BodyDeclaration<?>> members = type.getMembers();
-            for (BodyDeclaration<?> member : members) {
-                
-                // Storage for parameters and member name
-                NodeList<Parameter> parameters;
-                
-                MemberInfo memberInfo = new MemberInfo ();
-                            
-                // Check and see if we found a method declaration or ctor declaration
-                if (member instanceof MethodDeclaration) {
-                    MethodDeclaration method = (MethodDeclaration) member;
-                    memberInfo.Name = method.getName().asString();
-                    parameters = method.getParameters();
-                } else if (member instanceof ConstructorDeclaration) {
-                    ConstructorDeclaration ctor = (ConstructorDeclaration) member;
-                    memberInfo.Name = ctor.getName().asString();
-                    parameters = ctor.getParameters();
-                } else {
-                    continue; // Otherwise skip this member
-                }
-                
-                for (Parameter param : parameters) {
-                    // Get the parameter type's name
-                    ParamInfo paramInfo = new ParamInfo ();
-                    paramInfo.Name = param.getName().asString();
-                    paramInfo.TypeName = param.getType().asString();
-                    
-                    memberInfo.Parameters.add(paramInfo);  
-                }
-                
-                typeInfo.Members.add(memberInfo);
-            }
-            
-            pkgInfo.put(typeName, typeInfo);
+            CheckType(null, classOrIface, pkgInfo);
         }
         
         info.put(pkgName, pkgInfo);
     } 
+    
+    static void CheckType(ClassOrInterfaceDeclaration parentType, ClassOrInterfaceDeclaration type, Map<String, TypeInfo> pkgInfo)
+    {
+        Boolean isInterface = ((ClassOrInterfaceDeclaration) type).isInterface();
+
+        // Get our type's name
+        String typeName = type.getNameAsString();
+        
+        if (parentType != null)
+            typeName = parentType.getNameAsString() + "." + typeName;
+
+        TypeInfo typeInfo = pkgInfo.getOrDefault(typeName, new TypeInfo (typeName, isInterface));
+
+        // Go through all fields, methods, etc. in this type
+        NodeList<BodyDeclaration<?>> members = type.getMembers();
+        for (BodyDeclaration<?> member : members) {
+
+            // Storage for parameters and member name
+            NodeList<Parameter> parameters = new NodeList<>();
+
+            MemberInfo memberInfo = new MemberInfo ();
+
+            // Check and see if we found a method declaration or ctor declaration
+            if (member instanceof MethodDeclaration) {
+                MethodDeclaration method = (MethodDeclaration) member;
+                memberInfo.Name = method.getName().asString();
+                parameters = method.getParameters();
+            } else if (member instanceof ConstructorDeclaration) {
+                ConstructorDeclaration ctor = (ConstructorDeclaration) member;
+                memberInfo.Name = ctor.getName().asString();
+                parameters = ctor.getParameters();
+            }
+            else if (member instanceof ClassOrInterfaceDeclaration)
+            {
+                CheckType(type, (ClassOrInterfaceDeclaration)member, pkgInfo);
+                continue;
+            }
+            else
+            {
+                continue; // Otherwise skip this member
+            }
+
+            for (Parameter param : parameters) {
+                // Get the parameter type's name
+                ParamInfo paramInfo = new ParamInfo ();
+                paramInfo.Name = param.getName().asString();
+                paramInfo.TypeName = param.getType().asString();
+
+                memberInfo.Parameters.add(paramInfo);  
+            }
+
+            typeInfo.Members.add(memberInfo);
+        }
+
+        pkgInfo.put(typeName, typeInfo);
+    }
 }
