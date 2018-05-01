@@ -29,10 +29,30 @@ import java.util.zip.ZipFile;
  */
 public class Main {
     public static void main(String[] args) throws Exception {
-        final String helpText = "JavaASTParameterNames.jar java1-sources.jar java2-sources.jar ... output.txt";
+        final String helpText = "JavaASTParameterNames.jar [--verbose] [--xml|--text] java1-sources.jar java2-sources.jar ... output.txt|output.xml";
         
         List<String> files = new ArrayList<>();
-        files.addAll(Arrays.asList(args));
+        
+        boolean xml = false;
+        boolean verbose = false;
+        
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            
+            if ("--xml".equals(arg) || "-x".equals(arg)) {
+                xml = true;
+            } else if ("--text".equals(arg) || "-t".equals(arg)) {
+                xml = false;  
+            } else if ("--verbose".equals(arg) || "-v".equals(arg)) {
+                verbose = true;
+            } else {
+                files.add(arg);
+            }
+        }
+        
+//        files.add("/Users/redth/Desktop/android-support-new/externals/com.android.support/recyclerview-v7-sources.jar");
+//        files.add("/Users/redth/Desktop/out.xml");
+//        xml = true;
         
         // Make sure there's at least one input, and one output file
         if (files.size() < 2) {
@@ -78,8 +98,14 @@ public class Main {
             }   
         }
         
-        //PrintConsole (data);
-        PrintParameterNameTextFile (data, outputFile);
+        if (verbose)
+            PrintConsole (data);
+
+        if (xml)
+            PrintTransformMetadataXmlFile(data, outputFile);
+        else
+            PrintParameterNameTextFile(data, outputFile);
+            
     }
     
     static void PrintConsole (Map<String, Map<String, TypeInfo>> info)
@@ -114,35 +140,8 @@ public class Main {
         }
     }
     
-    static void PrintParameterNameTextFile (Map<String, Map<String, TypeInfo>> info, String outputFile) throws IOException
+    static void PrintParameterNameTextFile(Map<String, Map<String, TypeInfo>> info, String outputFile) throws IOException
     {
-        /*
-        * The Text Format is:
-        * 
-        * package {packagename}
-        * ;---------------------------------------
-        *   interface {interfacename}{optional_type_parameters} -or-
-        *   class {classname}{optional_type_parameters}
-        *     {optional_type_parameters}{methodname}({parameters})
-        * 
-        * Anything after ; is treated as comment.
-        * 
-        * optional_type_parameters: "" -or- "<A,B,C>" (no constraints allowed)
-        * parameters: type1 p0, type2 p1 (pairs of {type} {name}, joined by ", ")
-        * 
-        * It is with strict indentations. two spaces for types, four spaces for methods.
-        * 
-        * Constructors are named as "#ctor".
-        * 
-        * Commas are used by both parameter types and parameter separators,
-        * but only parameter separators can be followed by a whitespace.
-        * It is useful when writing text parsers for this format.
-        * 
-        * Type names may contain whitespaces in case it is with generic constraints (e.g. "? extends FooBar"),
-        * so when parsing a parameter type-name pair, the only trustworthy whitespace for tokenizing name is the *last* one.
-        * 
-        */
-        
         java.io.File outFile = new java.io.File(outputFile);
         if (outFile.exists())
             outFile.delete();
@@ -194,6 +193,85 @@ public class Main {
             
             out.flush();
         }
+        
+        out.close();
+    }
+    
+    static void PrintTransformMetadataXmlFile (Map<String, Map<String, TypeInfo>> info, String outputFile) throws IOException
+    {
+        java.io.File outFile = new java.io.File(outputFile);
+        if (outFile.exists())
+            outFile.delete();
+        
+        BufferedWriter out = new BufferedWriter(new FileWriter(outputFile));
+ 
+        out.write("<metadata>");
+        out.newLine();
+        
+        for (String pkgName : info.keySet()) {
+            
+            Map<String, TypeInfo> types = info.get(pkgName);
+            
+            for (String typeName : types.keySet()) {
+                
+                TypeInfo typeInfo = types.get(typeName);
+                
+                for (MemberInfo memberInfo : typeInfo.Members) {
+                    
+                    int paramCount = memberInfo.Parameters.size();
+                    
+                    for (int i = 0; i < memberInfo.Parameters.size (); i++) {
+                        ParamInfo paramInfo = memberInfo.Parameters.get(i);
+                    
+                        out.write("<attr path=\"/api/package[@name='");
+                        out.write(pkgName);
+                        out.write("']/");
+
+                        if (typeInfo.IsInterface)
+                            out.write("interface");
+                        else
+                            out.write("class");
+
+                        out.write("[@name='");
+                        out.write(typeName);
+                        out.write("']/method[@name='");
+                        out.write(memberInfo.Name);
+                        out.write("'");
+
+                        out.write(" and count(parameter)=");
+                        out.write(paramCount);
+
+                        // constructors need special name
+                        
+                         for (int n = 0; n < memberInfo.Parameters.size (); n++) {
+                            ParamInfo innerParamInfo = memberInfo.Parameters.get(n);
+                            out.write(" and parameter[");
+                            out.write(Integer.toString(n + 1));
+                            out.write("][contains(@type, '");
+                            
+                            String ipName = innerParamInfo.TypeName.replace("<", "&lt;").replace(">", "&gt;");
+                            out.write(ipName);
+                            out.write("')]");
+                         }
+                         
+                         out.write("]/parameter[");
+                         out.write(Integer.toString(i + 1));
+                         out.write("]\" name=\"managedName\">");
+                         out.write(paramInfo.Name);
+                         out.write("</attr>");
+                         out.newLine();
+                    }
+                }
+                
+                out.flush();
+            }
+            
+            out.flush();
+        }
+        
+        out.write("</metadata>");
+        out.newLine();
+        out.flush();
         
         out.close();
     }
