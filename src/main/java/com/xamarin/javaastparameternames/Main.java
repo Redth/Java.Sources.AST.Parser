@@ -239,7 +239,7 @@ public class Main {
                         out.write("'");
 
                         out.write(" and count(parameter)=");
-                        out.write(paramCount);
+                        out.write(Integer.toString(paramCount));
 
                         // constructors need special name
                         
