@@ -180,7 +180,7 @@ public class Main {
                     for (int i = 0; i < memberInfo.Parameters.size (); i++) {
                         ParamInfo paramInfo = memberInfo.Parameters.get(i);
                         
-                        out.write (paramInfo.TypeName + " " + paramInfo.Name);
+                        out.write (paramInfo.TypeName + " " + FixCSharpParameterName(paramInfo.Name));
                         
                         if (i < (memberInfo.Parameters.size() - 1))
                             out.write (", ");
@@ -257,7 +257,10 @@ public class Main {
                          out.write("]/parameter[");
                          out.write(Integer.toString(i + 1));
                          out.write("]\" name=\"managedName\">");
-                         out.write(paramInfo.Name);
+                         
+                         String pName = FixCSharpParameterName(paramInfo.Name);
+
+                         out.write(pName);
                          out.write("</attr>");
                          out.newLine();
                     }
@@ -274,6 +277,27 @@ public class Main {
         out.flush();
         
         out.close();
+    }
+    
+    final static List<String> reservedNames = Arrays.asList(
+        "abstract", "as", "base", "bool", "break", "byte", "case", "catch",
+        "char", "checked", "class", "const", "continue", "decimal", "default",
+        "delegate", "do", "double", "else", "enum", "event", "explicit",
+        "extern", "finally", "fixed", "float", "for", "foreach", "goto", "if",
+        "implicit", "in", "int", "interface", "internal", "is", "lock", "long",
+        "namespace", "new", "null", "object", "operator", "out", "override",
+        "params", "private	", "public", "readonly", "ref", "return",
+        "sbyte", "sealed", "short", "sizeof", "stackalloc", "static", "string",
+        "struct", "switch", "this", "throw", "try", "typeof", "unit", "ulong",
+        "unchecked", "unsafe", "ushort", "using", "virtual", "void", "volatile",
+        "while", "false", "true");
+    
+    static String FixCSharpParameterName(String name)
+    {
+        if (reservedNames.contains(name))
+            return name + "Param";
+        
+        return name;
     }
     
     static void ParseJavaStream (InputStream stream,  Map<String, Map<String, TypeInfo>> info)
