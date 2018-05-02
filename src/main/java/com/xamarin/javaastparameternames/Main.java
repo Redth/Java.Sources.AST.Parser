@@ -295,7 +295,7 @@ public class Main {
     static String FixCSharpParameterName(String name)
     {
         if (reservedNames.contains(name))
-            return name + "Param";
+            return "@" + name;
         
         return name;
     }
